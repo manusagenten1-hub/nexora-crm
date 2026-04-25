@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppContext, Sale, ServiceCategory, Lead } from '../context/AppContext';
-import { Search, Plus, ExternalLink, Trash2, ChevronDown } from 'lucide-react';
+import { useAppContext, Sale, ServiceCategory, Lead, Member, Commission } from '../context/AppContext';
+import { Search, Plus, ExternalLink, Trash2, ChevronDown, Percent } from 'lucide-react';
 
 const CATEGORIES: ServiceCategory[] = [
   'Sistema Digital Completo',
@@ -217,7 +217,8 @@ function LeadSelect({ onSelectLead }: { onSelectLead: (lead: Lead | null) => voi
   );
 }
 
-function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: Omit<Sale, 'id' | 'date'>) => void }) {
+function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: Omit<Sale, 'id' | 'date'>, commissions: Omit<Commission, 'id' | 'date' | 'status' | 'saleId'>[]) => void }) {
+  const { members } = useAppContext();
   const [selectedLeadId, setSelectedLeadId] = useState<string | undefined>();
   const [category, setCategory] = useState<ServiceCategory>('Sistema Digital Completo');
   const [companyName, setCompanyName] = useState('');
@@ -227,6 +228,15 @@ function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: O
   const [siteUrl, setSiteUrl] = useState('');
   const [price, setPrice] = useState<string>('');
   const [mrr, setMrr] = useState<string>('');
+
+  // Commissions
+  const [responsibleId, setResponsibleId] = useState('');
+  const [respBasis, setRespBasis] = useState<'Implantação' | 'Recorrência' | 'Ambos'>('Implantação');
+  const [respPercent, setRespPercent] = useState('');
+
+  const [indicatorId, setIndicatorId] = useState('');
+  const [indBasis, setIndBasis] = useState<'Implantação' | 'Recorrência'>('Implantação');
+  const [indPercent, setIndPercent] = useState('');
 
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -265,6 +275,58 @@ function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: O
     e.preventDefault();
     if (!companyName || !ownerName || !whatsapp || !siteUrl || !price) return;
 
+    const numPrice = price ? Number(price.replace(/\./g, '').replace(',', '.')) : 0;
+    const numMrr = mrr ? Number(mrr.replace(/\./g, '').replace(',', '.')) : 0;
+
+    const commissions: Omit<Commission, 'id' | 'date' | 'status' | 'saleId'>[] = [];
+
+    if (responsibleId && respPercent) {
+      const p = parseFloat(respPercent.replace(',', '.'));
+      if (!isNaN(p) && p > 0) {
+        if (respBasis === 'Implantação' || respBasis === 'Ambos') {
+          commissions.push({
+            memberId: responsibleId,
+            type: 'Fechamento',
+            saleValue: numPrice,
+            commissionValue: numPrice * (p / 100),
+            isRecurring: false,
+          });
+        }
+        if ((respBasis === 'Recorrência' || respBasis === 'Ambos') && numMrr > 0) {
+          commissions.push({
+            memberId: responsibleId,
+            type: 'Fechamento',
+            saleValue: numMrr,
+            commissionValue: numMrr * (p / 100),
+            isRecurring: true,
+          });
+        }
+      }
+    }
+
+    if (indicatorId && indPercent) {
+      const p = parseFloat(indPercent.replace(',', '.'));
+      if (!isNaN(p) && p > 0) {
+        if (indBasis === 'Implantação') {
+          commissions.push({
+            memberId: indicatorId,
+            type: 'Indicação',
+            saleValue: numPrice,
+            commissionValue: numPrice * (p / 100),
+            isRecurring: false,
+          });
+        } else if (indBasis === 'Recorrência' && numMrr > 0) {
+          commissions.push({
+            memberId: indicatorId,
+            type: 'Indicação',
+            saleValue: numMrr,
+            commissionValue: numMrr * (p / 100),
+            isRecurring: true,
+          });
+        }
+      }
+    }
+
     onAdd({
       leadId: selectedLeadId,
       category,
@@ -273,9 +335,11 @@ function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: O
       ownerName,
       whatsapp,
       siteUrl,
-      price: price ? Number(price.replace(/\./g, '').replace(',', '.')) : 0,
-      mrr: mrr ? Number(mrr.replace(/\./g, '').replace(',', '.')) : 0
-    });
+      price: numPrice,
+      mrr: numMrr,
+      responsibleId: responsibleId || undefined,
+      indicatorId: indicatorId || undefined
+    }, commissions);
     onClose();
   };
 
@@ -397,6 +461,99 @@ function AddSaleModal({ onClose, onAdd }: { onClose: () => void, onAdd: (data: O
                 </div>
               </div>
 
+            </div>
+          </div>
+
+          <div className="pt-6 mt-6 border-t border-white/5 space-y-4">
+            <h3 className="text-sm font-semibold text-white/80 uppercase tracking-wider flex items-center gap-2">
+              <Percent size={14} className="text-nexora-neon" /> Comissionamento
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/[0.02] border border-white/5 p-4 rounded-xl">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-400">Responsável pelo Fechamento</label>
+                  <select 
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="w-full bg-[#151f28] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon transition-colors"
+                  >
+                    <option value="">Nenhum (Sem comissão)</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+                {responsibleId && (
+                  <div className="flex gap-3">
+                    <div className="space-y-1.5 flex-1">
+                      <label className="text-xs font-medium text-gray-400">% Comissão</label>
+                      <div className="relative">
+                        <input 
+                          type="number" step="0.5" 
+                          value={respPercent} onChange={e => setRespPercent(e.target.value)}
+                          className="w-full bg-[#1a2332] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon"
+                          placeholder="Ex: 10"
+                        />
+                        <span className="absolute right-3 top-2 text-gray-500">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 flex-[1.5]">
+                      <label className="text-xs font-medium text-gray-400">Base de Cálculo</label>
+                      <select 
+                        value={respBasis} onChange={e => setRespBasis(e.target.value as any)}
+                        className="w-full bg-[#1a2332] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon"
+                      >
+                        <option value="Implantação">Implant. Única</option>
+                        <option value="Recorrência">Recorrência (Mensal)</option>
+                        <option value="Ambos">Ambos</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-400">Indicador (Opcional)</label>
+                  <select 
+                    value={indicatorId}
+                    onChange={(e) => setIndicatorId(e.target.value)}
+                    className="w-full bg-[#151f28] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon transition-colors"
+                  >
+                    <option value="">Nenhum</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+                {indicatorId && (
+                  <div className="flex gap-3">
+                    <div className="space-y-1.5 flex-1">
+                      <label className="text-xs font-medium text-gray-400">% Indicação</label>
+                      <div className="relative">
+                        <input 
+                          type="number" step="0.5" 
+                          value={indPercent} onChange={e => setIndPercent(e.target.value)}
+                          className="w-full bg-[#1a2332] border border-white/10 rounded-lg pl-3 pr-8 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon"
+                          placeholder="Ex: 5"
+                        />
+                        <span className="absolute right-3 top-2 text-gray-500">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 flex-[1.5]">
+                      <label className="text-xs font-medium text-gray-400">Base de Cálculo</label>
+                      <select 
+                        value={indBasis} onChange={e => setIndBasis(e.target.value as any)}
+                        className="w-full bg-[#1a2332] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-nexora-neon"
+                      >
+                        <option value="Implantação">Implant. Única</option>
+                        <option value="Recorrência">Recorrência (Mensal)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
