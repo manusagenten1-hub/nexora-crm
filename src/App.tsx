@@ -9,6 +9,7 @@ import Expenses from './pages/Expenses';
 import Leads from './pages/Leads';
 import Clients from './pages/Clients';
 import Agenda from './pages/Agenda';
+import Commissions from './pages/Commissions';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
               <Route path="agenda" element={<Agenda />} />
               <Route path="leads" element={<Leads />} />
               <Route path="vendas" element={<Sales />} />
+              <Route path="comissoes" element={<Commissions />} />
               <Route path="clientes" element={<Clients />} />
               <Route path="despesas" element={<Expenses />} />
               <Route path="membros" element={<Members />} />
