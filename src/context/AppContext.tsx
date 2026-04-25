@@ -9,6 +9,18 @@ export type CalendarEventType = 'Reunião' | 'Follow-up' | 'Tarefa interna';
 export type EventPriority = 'Baixa' | 'Média' | 'Alta';
 export type EventStatus = 'Pendente' | 'Concluído';
 
+export interface Commission {
+  id: string;
+  memberId: string;
+  saleId: string;
+  type: 'Fechamento' | 'Indicação';
+  saleValue: number; // The base value used for calculation
+  commissionValue: number;
+  date: string;
+  status: 'Pendente' | 'Pago';
+  isRecurring: boolean;
+}
+
 export interface Sale {
   id: string;
   leadId?: string;
@@ -21,6 +33,8 @@ export interface Sale {
   price: number; // Implantação
   mrr: number; // Recorrência
   date: string;
+  responsibleId?: string;
+  indicatorId?: string;
 }
 
 export interface Client {
@@ -84,7 +98,7 @@ export interface Lead {
 
 interface AppContextType {
   sales: Sale[];
-  addSale: (sale: Omit<Sale, 'id' | 'date'>) => void;
+  addSale: (sale: Omit<Sale, 'id' | 'date'>, commissions?: Omit<Commission, 'id' | 'date' | 'status' | 'saleId'>[]) => void;
   deleteSale: (id: string) => void;
   members: Member[];
   addMember: (member: Omit<Member, 'id'>) => void;
@@ -106,6 +120,10 @@ interface AppContextType {
   addAgendaEvent: (event: Omit<CalendarEvent, 'id' | 'status'>) => void;
   updateAgendaEventStatus: (id: string, status: EventStatus) => void;
   deleteAgendaEvent: (id: string) => void;
+  commissions: Commission[];
+  addCommission: (commission: Omit<Commission, 'id' | 'date' | 'status'>) => void;
+  updateCommissionStatus: (id: string, status: 'Pendente' | 'Pago') => void;
+  deleteCommission: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -275,6 +293,8 @@ const initialAgendaEvents: CalendarEvent[] = [
   }
 ];
 
+const initialCommissions: Commission[] = [];
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = localStorage.getItem('nexora_sales');
@@ -306,6 +326,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : initialAgendaEvents;
   });
 
+  const [commissions, setCommissions] = useState<Commission[]>(() => {
+    const saved = localStorage.getItem('nexora_commissions');
+    return saved ? JSON.parse(saved) : initialCommissions;
+  });
+
   useEffect(() => {
     localStorage.setItem('nexora_sales', JSON.stringify(sales));
   }, [sales]);
@@ -330,7 +355,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('nexora_events', JSON.stringify(agendaEvents));
   }, [agendaEvents]);
 
-  const addSale = (saleData: Omit<Sale, 'id' | 'date'>) => {
+  useEffect(() => {
+    localStorage.setItem('nexora_commissions', JSON.stringify(commissions));
+  }, [commissions]);
+
+  const addSale = (saleData: Omit<Sale, 'id' | 'date'>, saleCommissions?: Omit<Commission, 'id' | 'date' | 'status' | 'saleId'>[]) => {
     const newSaleId = Math.random().toString(36).substr(2, 9);
     const newSale: Sale = {
       ...saleData,
@@ -358,6 +387,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Ativo'
     };
     setClients(prev => [newClient, ...prev]);
+
+    if (saleCommissions && saleCommissions.length > 0) {
+      const generatedCommissions = saleCommissions.map(c => ({
+        ...c,
+        id: Math.random().toString(36).substr(2, 9),
+        saleId: newSaleId,
+        date: new Date().toISOString(),
+        status: 'Pendente' as const
+      }));
+      setCommissions(prev => [...generatedCommissions, ...prev]);
+    }
   };
 
   const deleteSale = (id: string) => {
@@ -443,6 +483,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAgendaEvents(prev => prev.filter(e => e.id !== id));
   };
 
+  const addCommission = (commissionData: Omit<Commission, 'id' | 'date' | 'status'>) => {
+    const newCommission: Commission = {
+      ...commissionData,
+      id: Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      status: 'Pendente'
+    };
+    setCommissions(prev => [newCommission, ...prev]);
+  };
+
+  const updateCommissionStatus = (id: string, status: 'Pendente' | 'Pago') => {
+    setCommissions(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+  };
+
+  const deleteCommission = (id: string) => {
+    setCommissions(prev => prev.filter(c => c.id !== id));
+  };
+
   return (
     <AppContext.Provider value={{
       sales, addSale, deleteSale,
@@ -450,7 +508,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       expenses, addExpense, toggleExpenseStatus, deleteExpense,
       leads, addLead, updateLead, deleteLead,
       clients, updateClientStatus, deleteClient,
-      agendaEvents, addAgendaEvent, updateAgendaEventStatus, deleteAgendaEvent
+      agendaEvents, addAgendaEvent, updateAgendaEventStatus, deleteAgendaEvent,
+      commissions, addCommission, updateCommissionStatus, deleteCommission
     }}>
       {children}
     </AppContext.Provider>
