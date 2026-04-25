@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, Menu, DollarSign, Target, Briefcase, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, Menu, DollarSign, Target, Briefcase, Calendar, Percent } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState } from 'react';
 import RelaxBullet from './RelaxBullet';
@@ -13,6 +13,7 @@ const Sidebar = () => {
     { to: '/agenda', icon: Calendar, label: 'Agenda' },
     { to: '/leads', icon: Target, label: 'Leads' },
     { to: '/vendas', icon: CreditCard, label: 'Vendas' },
+    { to: '/comissoes', icon: Percent, label: 'Comissões' },
     { to: '/clientes', icon: Briefcase, label: 'Contratos' },
     { to: '/despesas', icon: DollarSign, label: 'Despesas' },
     { to: '/membros', icon: Users, label: 'Equipe' },
